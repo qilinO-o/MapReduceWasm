@@ -1,0 +1,13 @@
+[package]
+name = "master"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utils = { workspace = true }
+futures = "0.3"
+uuid = { workspace = true }
+tarpc = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }

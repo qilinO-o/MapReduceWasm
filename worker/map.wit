@@ -1,0 +1,9 @@
+package component:mapwc;
+
+interface map {
+    map: func(key: string, value: string) -> list<tuple<string, string>>;
+}
+
+world mapper {
+    export map;
+}

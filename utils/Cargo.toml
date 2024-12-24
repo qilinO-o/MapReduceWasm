@@ -1,0 +1,10 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tarpc = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}

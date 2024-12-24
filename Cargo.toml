@@ -1,0 +1,26 @@
+[package]
+name = "MapReduce-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+worker = { version = "0.1", path = "./worker" }
+master = { version = "0.1", path = "./master" }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+anyhow = { version = "1.0.72" }
+
+[workspace]
+members = [
+    "utils",
+	"master",
+	"worker", "map_wc", "playground",
+]
+
+[workspace.dependencies]
+utils = { version = "0.1", path = "./utils" }
+uuid = { version = "1.4", features = ["v4"] }
+tarpc = { version = "0.35", features = ["full"] }
+tracing = { version = "0.1" }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
+anyhow = { version = "1.0.72" }
