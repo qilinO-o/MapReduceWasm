@@ -7,7 +7,7 @@ struct Component;
 
 impl Guest for Component {
     fn reduce(key: String, values: Vec<String>) -> (String, String) {
-        return (key, values.get(0).unwrap().to_string());
+        return (key, values.len().to_string());
     }
 }
 
