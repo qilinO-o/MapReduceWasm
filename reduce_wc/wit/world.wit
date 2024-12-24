@@ -1,0 +1,9 @@
+package component:reducewc;
+
+interface reduce {
+    reduce: func(key: string, values: list<string>) -> tuple<string, string>;
+}
+
+world reducer {
+    export reduce;
+}
