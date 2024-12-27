@@ -2,3 +2,7 @@
 .vscode
 playground
 data
+wasm_file
+*.sh
+*.wasm
+__pycache__
