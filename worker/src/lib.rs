@@ -1,8 +1,8 @@
 mod state;
 mod wasmmaprt;
 mod wasmreducert;
-use wasmmaprt::do_wasm_map;
-use wasmreducert::do_wasm_reduce;
+use wasmmaprt::WasmMapRuntime;
+use wasmreducert::WasmReduceRuntime;
 use utils::*;
 use uuid::Uuid;
 use tarpc::{client, context, tokio_serde::formats::Json};
@@ -10,6 +10,7 @@ use tokio::time::{sleep, Duration};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufWriter, Write};
+use std::path::Path;
 use anyhow::Context as AnyhowContext;
 
 pub struct Worker {
@@ -25,8 +26,13 @@ impl Worker {
 
     pub async fn run(self, server_address: String) -> anyhow::Result<()> {
         init_tracing();
+        let dir_path = "./out";
+        if !Path::new(dir_path).exists() {
+            fs::create_dir(dir_path)?;
+        }
         let client_transport = tarpc::serde_transport::tcp::connect(server_address, Json::default);
-        let client = CoordinatorRPCClient::new(client::Config::default(), client_transport.await?).spawn();
+        let client = CoordinatorRPCClient::new(client::Config::default(), client_transport.await
+            .context("Worker new client error")?).spawn();
         
         loop {
             let task_result = client.apply_task(context::current(), self.worker_id).await
@@ -60,14 +66,18 @@ impl Worker {
     }
 
     async fn do_map_task(&self, client: &CoordinatorRPCClient, task: Task) -> anyhow::Result<()>  {
+        tracing::info!("Worker {} start to do map task {:?}", self.worker_id, task.task_id);
         if let TaskContext::MapTask { wasm_bytes, input_filepath, num_reduce } = task.task_context {
             let wasm_bytes = wasm_bytes.unwrap_or_default();
             let input_filepath = input_filepath;
+            let cpath = Path::new(&input_filepath);
             let num_reduce = num_reduce;
             // do map task
-            let file_content = fs::read_to_string(input_filepath.as_str())
+            let file_content = fs::read_to_string(cpath)
                 .context("Worker open source file error")?;
-            let result = do_wasm_map(&wasm_bytes, &input_filepath, &file_content)
+            let mut wasm_map_rt = WasmMapRuntime::new(&wasm_bytes)
+                .context("Worker new wasm map runtime error")?;
+            let result = wasm_map_rt.do_map(&input_filepath, &file_content)
                 .context("Map wasm result error")?;
             self.write_map_result(client, task.task_id, num_reduce, &result).await
                 .context("Write map result error")?;
@@ -79,11 +89,13 @@ impl Worker {
     }
 
     async fn write_map_result(&self, client: &CoordinatorRPCClient, task_id: TaskId, num_reduce: u32, result: &Vec<(String, String)>) -> anyhow::Result<()> {
+        tracing::info!("Start write map result");
         let mut buffers = Vec::new();
         let mut files = Vec::new();
         for i in 0..num_reduce {
             let temp_output_filepath = format!("./out/mr-{}-{}-{}", i, task_id, self.worker_id);
-            let f = fs::File::create(temp_output_filepath.as_str())
+            let cpath = Path::new(&temp_output_filepath);
+            let f = fs::File::create(cpath)
                 .context("Create output file error")?;
             files.push(temp_output_filepath);
             let writer = BufWriter::new(f);
@@ -106,7 +118,8 @@ impl Worker {
             .context("Worker commit task rpc error")?;
         if !commit_status {
             for path in files {
-                fs::remove_file(path)
+                let cpath = Path::new(&path);
+                fs::remove_file(cpath)
                     .context("Remove temp map output file after submission error")?;
             }
         }
@@ -114,6 +127,7 @@ impl Worker {
     }
 
     async fn do_reduce_task(&self, client: &CoordinatorRPCClient, task: Task) -> anyhow::Result<()> {
+        tracing::info!("Worker {} start to do reduce task {:?}", self.worker_id, task.task_id);
         if let TaskContext::ReduceTask { wasm_bytes, reduce_idx, mapper_ids } = task.task_context {
             let wasm_bytes = wasm_bytes.unwrap_or_default();
             let reduce_idx = reduce_idx;
@@ -122,7 +136,8 @@ impl Worker {
             let mut all_kv: HashMap<String, Vec<String>> = HashMap::new();
             for (t_id, w_id) in mapper_ids {
                 let input_filepath = format!("./out/mr-{}-{}-{}", reduce_idx, t_id, w_id);
-                let file_content = fs::read_to_string(input_filepath.as_str())
+                let cpath = Path::new(&input_filepath);
+                let file_content = fs::read_to_string(cpath)
                     .context("Worker open map result file error")?;
                 let mut lines = file_content.lines();
                 while let Some(l) = lines.next() {
@@ -135,9 +150,18 @@ impl Worker {
                     }
                 }
             }
+            tracing::info!("Shuffle complete");
             let mut all_results = Vec::new();
+            let kvnum = all_kv.len();
+            let mut kvcnt = 1;
+            let mut wasm_reduce_rt = WasmReduceRuntime::new(&wasm_bytes)
+                .context("Worker new wasm reduce runtime error")?;
             for (k, vs) in all_kv.iter() {
-                let result = do_wasm_reduce(&wasm_bytes, k, vs)
+                if kvcnt % 1000 == 1 {
+                    tracing::info!("Do reduce task for key {} no. {} in {} kvs", k, kvcnt, kvnum);
+                }
+                kvcnt += 1;
+                let result = wasm_reduce_rt.do_reduce(k, vs)
                     .context("Reduce wasm result error")?;
                 all_results.push(result);
             }
@@ -151,8 +175,10 @@ impl Worker {
     }
 
     async fn write_reduce_result(&self, client: &CoordinatorRPCClient, task_id: TaskId, result: &Vec<(String, String)>) -> anyhow::Result<()> {
+        tracing::info!("Start write reduce result");
         let temp_output_filepath = format!("./out/mr-{}-{}", task_id, self.worker_id);
-        let f = fs::File::create(temp_output_filepath.as_str())
+        let cpath = Path::new(&temp_output_filepath);
+        let f = fs::File::create(cpath)
             .context("Create output file error")?;
         let mut writer = BufWriter::new(f);
         for (key, value) in result {
@@ -163,7 +189,7 @@ impl Worker {
         let commit_status = client.commit_task(context::current(), self.worker_id, task_id, None).await
             .context("Worker commit task rpc error")?;
         if !commit_status {
-            fs::remove_file(temp_output_filepath)
+            fs::remove_file(cpath)
                 .context("Remove temp reduce output file after submission error")?;
         }
         Ok(())
