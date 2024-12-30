@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use std::{hash::{DefaultHasher, Hash, Hasher}, u32};
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, BufWriter, Write};
@@ -82,6 +82,7 @@ impl TaskContext {
 pub fn init_tracing() {
     tracing_subscriber::registry()
         .with(fmt::layer())
+        .with(EnvFilter::new("debug,wasmtime=error,cranelift=error,tarpc=error"))
         .init();
 }
 
