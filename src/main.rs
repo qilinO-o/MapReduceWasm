@@ -1,5 +1,5 @@
 use worker::Worker;
-use master::CoordinatorServer;
+use master::Master;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,14 +15,14 @@ async fn main() -> anyhow::Result<()> {
             let worker = Worker::new();
             worker.run(addr.to_string()).await?;
         } else if server_type == "master" {
-            if args.len() == 5 {
+            if args.len() == 6 {
                 let num_reduces = args[3].parse::<u32>()?;
                 let map_wasm_file = &args[4];
                 let reduce_wasm_file = &args[5];
                 let map_wasm_bytes = std::fs::read(map_wasm_file)?;
                 let reduce_wasm_bytes = std::fs::read(reduce_wasm_file)?;
-                let coordinator = CoordinatorServer::new(files, num_reduces, map_wasm_bytes, reduce_wasm_bytes);
-                coordinator.run(addr.to_string()).await?;
+                let master = Master::new(files, num_reduces, map_wasm_bytes, reduce_wasm_bytes, 60);
+                master.run(addr.to_string()).await?;
             } else {
                 Err(anyhow::anyhow!("Usage: master <addr:port> <num_reduces> <map_wasm_file> <reduce_wasm_file>"))?;
             }
