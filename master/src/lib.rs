@@ -211,7 +211,9 @@ impl Master {
                         self.timeout);
                     tracing::info!("Coordinator info {:?}", server.get_info());
                     
-                    let _ = tx.send(server.coordinator.clone());
+                    if let Err(r) = tx.try_send(server.coordinator.clone()) {
+                        tracing::info!("Coordinator failed to send coordinator arc to main thread {:?}", r);
+                    }
                     channel.execute(server.serve()).for_each(Self::spawn)
                 })
                 .buffer_unordered(10)
@@ -219,9 +221,8 @@ impl Master {
                 .await;
         });
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-        tracing::info!("!!!Coordinator server started, waiting to check if map reduce is done");
+        tracing::info!("Coordinator server started, waiting to check if map reduce is done");
         let coordinator = rx.recv().await.unwrap();
-        tracing::info!("!!!Coordinator server started, waiting to check if map reduce is done");
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             tracing::info!("Coordinator checking if map reduce is done");
