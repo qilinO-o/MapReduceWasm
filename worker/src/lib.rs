@@ -5,7 +5,7 @@ use wasmmaprt::WasmMapRuntime;
 use wasmreducert::WasmReduceRuntime;
 use utils::*;
 use uuid::Uuid;
-use tarpc::{client, context, tokio_serde::formats::Json};
+use tarpc::{client, context, tokio_serde::formats::Bincode};
 use tokio::time::{sleep, Duration};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -30,7 +30,8 @@ impl Worker {
         if !Path::new(dir_path).exists() {
             fs::create_dir(dir_path)?;
         }
-        let client_transport = tarpc::serde_transport::tcp::connect(server_address, Json::default);
+        let mut client_transport = tarpc::serde_transport::tcp::connect(server_address, Bincode::default);
+        client_transport.config_mut().max_frame_length(usize::MAX);
         let client = CoordinatorRPCClient::new(client::Config::default(), client_transport.await
             .context("Worker new client error")?).spawn();
         

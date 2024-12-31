@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, VecDeque}, fs, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 use utils::*;
 use uuid::Uuid;
-use tarpc::{context, server::{self, incoming::Incoming, Channel}, tokio_serde::formats::Json, };
+use tarpc::{context, server::{self, incoming::Incoming, Channel}, tokio_serde::formats::Bincode, };
 use futures::{future, prelude::*};
 use tokio::time::{sleep, Duration};
 use anyhow::Context as AnyhowContext;
@@ -191,7 +191,7 @@ impl Master {
 
     pub async fn run(self, server_address: String) -> anyhow::Result<()> {
         init_tracing();
-        let mut server_transport = tarpc::serde_transport::tcp::listen(&server_address, Json::default).await
+        let mut server_transport = tarpc::serde_transport::tcp::listen(&server_address, Bincode::default).await
             .context("Coordinator tcp listen error")?;
         tracing::info!("Coordinator server listening on {}", server_address);
         server_transport.config_mut().max_frame_length(usize::MAX);
