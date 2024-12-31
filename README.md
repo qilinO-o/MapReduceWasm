@@ -25,13 +25,13 @@ componentize-py --wit-path ./map.wit --world mapper componentize app -o map_wc.w
 ## Start Server
 Start Master server:
 ```shell
-cargo run --release -- master localhost:12345 4 ./wasm_file/map_wc.wasm ./wasm_file/reduce_wc.wasm
+cargo run --release -- master localhost:12345 4 ./wasm_file/map_wc.wasm ./wasm_file/reduce_wc.wasm 10
 ```
 Start Worker server:
 ```shell
 cargo run --release -- worker localhost:12345
 ```
-Or simply run the executable file with `Usage: <server_type> <addr:port> [num_reduces, map_wasm_file, reduce_wasm_file]`.
+Or simply run the executable file with `Usage: <server_type> <addr:port> [num_reduces map_wasm_file reduce_wasm_file [timeout_sec]]`.
 
 ## Build a Task from Scratch
 All following examples build the map task, reduce task is all the same.

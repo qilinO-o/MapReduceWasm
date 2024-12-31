@@ -15,22 +15,26 @@ async fn main() -> anyhow::Result<()> {
             let worker = Worker::new();
             worker.run(addr.to_string()).await?;
         } else if server_type == "master" {
-            if args.len() == 6 {
+            if args.len() >= 6 {
                 let num_reduces = args[3].parse::<u32>()?;
+                let mut timeout: u64 = 60;
                 let map_wasm_file = &args[4];
                 let reduce_wasm_file = &args[5];
+                if args.len() == 7 {
+                    timeout = args[6].parse::<u64>()?;
+                }
                 let map_wasm_bytes = std::fs::read(map_wasm_file)?;
                 let reduce_wasm_bytes = std::fs::read(reduce_wasm_file)?;
-                let master = Master::new(files, num_reduces, map_wasm_bytes, reduce_wasm_bytes, 60);
+                let master = Master::new(files, num_reduces, map_wasm_bytes, reduce_wasm_bytes, timeout);
                 master.run(addr.to_string()).await?;
             } else {
-                Err(anyhow::anyhow!("Usage: master <addr:port> <num_reduces> <map_wasm_file> <reduce_wasm_file>"))?;
+                Err(anyhow::anyhow!("Usage: master <addr:port> <num_reduces> <map_wasm_file> <reduce_wasm_file> [timeout_sec]"))?;
             }
         } else {
-            Err(anyhow::anyhow!("Usage: <server_type> <addr:port> [num_reduces, map_wasm_file, reduce_wasm_file]"))?;
+            Err(anyhow::anyhow!("Usage: <server_type> <addr:port> [num_reduces map_wasm_file reduce_wasm_file [timeout_sec]]"))?;
         }
     } else {
-        Err(anyhow::anyhow!("Usage: <server_type> <addr:port> [num_reduces, map_wasm_file, reduce_wasm_file]"))?;
+        Err(anyhow::anyhow!("Usage: <server_type> <addr:port> [num_reduces map_wasm_file reduce_wasm_file [timeout_sec]]"))?;
     }
     Ok(())
 }
