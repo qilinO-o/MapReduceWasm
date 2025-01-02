@@ -77,8 +77,10 @@ impl Worker {
             let file_content = fs::read_to_string(cpath)
                 .context("Worker open source file error")?;
             let mut wasm_map_rt = WasmMapRuntime::new(&wasm_bytes)
+                .await
                 .context("Worker new wasm map runtime error")?;
             let result = wasm_map_rt.do_map(&input_filepath, &file_content)
+                .await
                 .context("Map wasm result error")?;
             self.write_map_result(client, task.task_id, num_reduce, &result).await
                 .context("Write map result error")?;
@@ -156,6 +158,7 @@ impl Worker {
             let kvnum = all_kv.len();
             let mut kvcnt = 1;
             let mut wasm_reduce_rt = WasmReduceRuntime::new(&wasm_bytes)
+                .await
                 .context("Worker new wasm reduce runtime error")?;
             for (k, vs) in all_kv.iter() {
                 if kvcnt % 1000 == 1 {
@@ -163,6 +166,7 @@ impl Worker {
                 }
                 kvcnt += 1;
                 let result = wasm_reduce_rt.do_reduce(k, vs)
+                    .await
                     .context("Reduce wasm result error")?;
                 all_results.push(result);
             }
