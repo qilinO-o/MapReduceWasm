@@ -11,6 +11,6 @@ class Map(mapper.Mapper):
         ret = []
         for word in value:
             if len(word) > 0:
-                ret.append(word, '1')
+                ret.append((word, '1'))
         return ret
     
