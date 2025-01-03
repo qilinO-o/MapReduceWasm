@@ -32,15 +32,18 @@ impl Worker {
         }
         let mut client_transport = tarpc::serde_transport::tcp::connect(server_address, Bincode::default);
         client_transport.config_mut().max_frame_length(usize::MAX);
-        let client = CoordinatorRPCClient::new(client::Config::default(), client_transport.await
+        let client = CoordinatorRPCClient::new(client::Config::default(), client_transport
+            .await
             .context("Worker new client error")?).spawn();
         
         loop {
-            let task_result = client.apply_task(context::current(), self.worker_id).await
+            let task_result = client.apply_task(context::current(), self.worker_id)
+                .await
                 .context("Worker apply for task rpc error")?;
             match task_result {
                 TaskResult::Ready(task) => {
-                    self.do_task(&client, task).await
+                    self.do_task(&client, task)
+                        .await
                         .context("Worker do task error")?;
                 }
                 TaskResult::Pending => {
@@ -59,9 +62,13 @@ impl Worker {
     async fn do_task(&self, client: &CoordinatorRPCClient, task: Task) -> anyhow::Result<()> {
         tracing::info!("Worker {} start to do task {:?}", self.worker_id, task.task_id);
         if task.is_map() {
-            self.do_map_task(client, task).await.context("Worker do map task error")?;
+            self.do_map_task(client, task)
+                .await
+                .context("Worker do map task error")?;
         } else {
-            self.do_reduce_task(client, task).await.context("Worker do reduce task error")?;
+            self.do_reduce_task(client, task)
+                .await
+                .context("Worker do reduce task error")?;
         }
         Ok(())
     }
@@ -82,7 +89,8 @@ impl Worker {
             let result = wasm_map_rt.do_map(&input_filepath, &file_content)
                 .await
                 .context("Map wasm result error")?;
-            self.write_map_result(client, task.task_id, num_reduce, &result).await
+            self.write_map_result(client, task.task_id, num_reduce, &result)
+                .await
                 .context("Write map result error")?;
         } else {
             tracing::error!("Worker {} get a wrong task {}", self.worker_id, task.task_id);
@@ -117,7 +125,12 @@ impl Worker {
             buffer.flush().context("Flush buffer error")?;
         }
 
-        let commit_status = client.commit_task(context::current(), self.worker_id, task_id, Some(used_reduce_idx.into_iter().collect())).await
+        let commit_status = client.commit_task(
+            context::current(),
+            self.worker_id, task_id,
+            Some(used_reduce_idx.into_iter().collect())
+        )
+            .await
             .context("Worker commit task rpc error")?;
         if !commit_status {
             for path in files {
@@ -170,7 +183,8 @@ impl Worker {
                     .context("Reduce wasm result error")?;
                 all_results.push(result);
             }
-            self.write_reduce_result(client, task.task_id, &all_results).await
+            self.write_reduce_result(client, task.task_id, &all_results)
+                .await
                 .context("Write reduce result error")?;
         } else {
             tracing::error!("Worker {} get a wrong task {}", self.worker_id, task.task_id);
@@ -191,7 +205,13 @@ impl Worker {
                 .context("Write reduce result(key value) error")?;
         }
         writer.flush().context("Flush buffer error")?;
-        let commit_status = client.commit_task(context::current(), self.worker_id, task_id, None).await
+        let commit_status = client.commit_task(
+            context::current(),
+            self.worker_id,
+            task_id,
+            None
+        )
+            .await
             .context("Worker commit task rpc error")?;
         if !commit_status {
             fs::remove_file(cpath)
